@@ -1,0 +1,44 @@
+# Secrets / config
+.env
+.env.*
+*.key
+*.pem
+secrets/
+config.local.*
+
+# Data (never commit harvested PII)
+data/
+*.csv
+*.parquet
+*.ndjson
+*.jsonl
+!examples/*.csv
+checkpoints/
+dumps/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+.next/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Tool outputs
+screaming-frog-exports/
+sequentum-exports/
+uipath-output/
+ranorex-output/
+ocr-cache/

@@ -1,0 +1,662 @@
+# =============================================================================
+# SOURCE REGISTRY — every website / dataset with recurring B2B data
+# =============================================================================
+# This is the machine-readable index the orchestrator consumes. Each entry is a
+# RECURRING data source: a place we re-harvest on a cadence to keep the warehouse
+# fresh. The adaptive router reads `access` + `waf` + `method` to choose how to
+# fetch, and `refresh` to schedule re-harvest.
+#
+# FIELDS
+#   id          unique slug
+#   name        human name
+#   country     ISO-3166 alpha-2, or "XX" for cross-border
+#   category    company_registry | financials | directors_ubo | contacts_directory
+#               | professional_network | company_web | vehicle_registry
+#               | crossborder | buy_signal
+#   access      api | bulk | open_data | scrape | ui_automation
+#   url         primary endpoint / portal
+#   refresh     realtime | daily | weekly | monthly | quarterly | annual
+#   cost        free | freemium | paid | restricted
+#   auth        none | apikey | account | oauth | gov_credential
+#   waf         none | cloudflare | datadome | akamai | imperva | login_wall | unknown
+#   method      preferred harvest method (see catalog/methods/)
+#   tier        T1_primary_official | T2_aggregator | T3_directory | T4_web | T5_benchmark
+#   legal       note on lawful basis / ToS posture
+#   confidence  verified | likely | uncertain   (uncertain = pending research pass)
+# =============================================================================
+
+# Confidence on EU entries is being independently web-verified by the running
+# research workflow; country-data/ holds the verified per-country detail.
+
+crossborder:
+  - id: gleif-lei
+    name: GLEIF — Legal Entity Identifier (golden cross-border key)
+    country: XX
+    category: crossborder
+    access: bulk
+    url: https://www.gleif.org/en/lei-data/gleif-concatenated-file
+    refresh: daily
+    cost: free
+    auth: none
+    waf: none
+    method: bulk_download
+    tier: T1_primary_official
+    legal: Open data (CC0). Use as the join key across national registries.
+    confidence: verified
+
+  - id: opencorporates
+    name: OpenCorporates — aggregated global company register
+    country: XX
+    category: company_registry
+    access: api
+    url: https://api.opencorporates.com/
+    refresh: weekly
+    cost: freemium
+    auth: apikey
+    waf: cloudflare
+    method: api_then_curl_cffi
+    tier: T2_aggregator
+    legal: API ToS applies; bulk reuse is licensed. Prefer national registries first.
+    confidence: verified
+
+  - id: eu-bris
+    name: BRIS / e-Justice Business Registers Interconnection
+    country: XX
+    category: company_registry
+    access: scrape
+    url: https://e-justice.europa.eu/content_find_a_company-489-en.do
+    refresh: monthly
+    cost: free
+    auth: none
+    waf: unknown
+    method: playwright
+    tier: T1_primary_official
+    legal: Official EU portal federating national registers.
+    confidence: likely
+
+  - id: opensanctions
+    name: OpenSanctions — PEP / sanctions / watchlists
+    country: XX
+    category: buy_signal
+    access: bulk
+    url: https://www.opensanctions.org/datasets/
+    refresh: daily
+    cost: free
+    auth: none
+    waf: none
+    method: bulk_download
+    tier: T1_primary_official
+    legal: Open data; for screening/compliance enrichment.
+    confidence: verified
+
+# ----------------------------- NORDICS --------------------------------------
+nordics:
+  - id: se-bolagsverket
+    name: Bolagsverket (Swedish Companies Registration Office)
+    country: SE
+    category: company_registry
+    access: api
+    url: https://bolagsverket.se/apierochoppendata
+    refresh: daily
+    cost: freemium
+    auth: apikey
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Official registry; iXBRL annual-report bulk also available.
+    confidence: verified
+  - id: se-allabolag
+    name: allabolag.se
+    country: SE
+    category: company_registry
+    access: scrape
+    url: https://www.allabolag.se/
+    refresh: weekly
+    cost: free
+    auth: none
+    waf: cloudflare
+    method: next_data_json   # __NEXT_DATA__ direct, NO proxy
+    tier: T2_aggregator
+    legal: Public pages; respect rate limits.
+    confidence: verified
+  - id: se-hitta
+    name: hitta.se (people + company contacts)
+    country: SE
+    category: contacts_directory
+    access: scrape
+    url: https://www.hitta.se/
+    refresh: weekly
+    cost: free
+    auth: none
+    waf: cloudflare
+    method: curl_cffi_next_data
+    tier: T3_directory
+    legal: Public directory; personal data → GDPR lawful-basis tagging required.
+    confidence: verified
+  - id: se-transportstyrelsen-vehicle
+    name: Transportstyrelsen — Vägtrafikregistret (vehicles)
+    country: SE
+    category: vehicle_registry
+    access: api
+    url: https://www.transportstyrelsen.se/
+    refresh: daily
+    cost: restricted
+    auth: gov_credential
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Personal/vehicle data is regulated; bulk access is permission-gated.
+    confidence: likely
+  - id: no-brreg
+    name: Brønnøysundregistrene (Enhetsregisteret)
+    country: NO
+    category: company_registry
+    access: open_data
+    url: https://data.brreg.no/enhetsregisteret/api/docs/index.html
+    refresh: daily
+    cost: free
+    auth: none
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Fully open API + bulk. Best-in-class.
+    confidence: verified
+  - id: no-vegvesen
+    name: Statens vegvesen — vehicle data
+    country: NO
+    category: vehicle_registry
+    access: api
+    url: https://www.vegvesen.no/
+    refresh: daily
+    cost: restricted
+    auth: apikey
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Lookup APIs exist; bulk personal data restricted.
+    confidence: likely
+  - id: dk-cvr
+    name: CVR / Virk — Danish Central Business Register
+    country: DK
+    category: company_registry
+    access: api
+    url: https://datacvr.virk.dk/artikel/system-til-system-adgang-til-cvr-data
+    refresh: daily
+    cost: free
+    auth: account
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Open data; Elasticsearch system-to-system access.
+    confidence: verified
+  - id: dk-dmr
+    name: Motorregister (DMR) — Danish vehicles
+    country: DK
+    category: vehicle_registry
+    access: scrape
+    url: https://motorregister.skat.dk/
+    refresh: weekly
+    cost: free
+    auth: none
+    waf: unknown
+    method: playwright
+    tier: T1_primary_official
+    legal: Public lookup; bulk personal data restricted.
+    confidence: likely
+  - id: fi-prh-avoindata
+    name: PRH / avoindata — Finnish Patent & Registration Office
+    country: FI
+    category: company_registry
+    access: open_data
+    url: https://avoindata.prh.fi/
+    refresh: daily
+    cost: free
+    auth: none
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Open data API (BIS / company registry).
+    confidence: verified
+  - id: fi-traficom
+    name: Traficom — Finnish vehicle open data
+    country: FI
+    category: vehicle_registry
+    access: open_data
+    url: https://www.traficom.fi/en/statistics-and-publications/open-data
+    refresh: monthly
+    cost: free
+    auth: none
+    waf: none
+    method: bulk_download
+    tier: T1_primary_official
+    legal: Open vehicle dataset (anonymised/aggregate); individual lookup gated.
+    confidence: likely
+  - id: is-rsk
+    name: Skatturin / RSK — Icelandic company register
+    country: IS
+    category: company_registry
+    access: scrape
+    url: https://www.skatturinn.is/
+    refresh: monthly
+    cost: freemium
+    auth: none
+    waf: unknown
+    method: playwright
+    tier: T1_primary_official
+    legal: Smaller market; confirm bulk availability.
+    confidence: uncertain
+
+# ----------------------------- DACH -----------------------------------------
+dach:
+  - id: de-handelsregister
+    name: Handelsregister / Unternehmensregister
+    country: DE
+    category: company_registry
+    access: scrape
+    url: https://www.handelsregister.de/
+    refresh: weekly
+    cost: free
+    auth: none
+    waf: unknown
+    method: playwright
+    tier: T1_primary_official
+    legal: Free since 2022 but UI-gated; expect form/session handling (UiPath candidate).
+    confidence: likely
+  - id: de-bundesanzeiger
+    name: Bundesanzeiger — financial filings (XBRL)
+    country: DE
+    category: financials
+    access: scrape
+    url: https://www.bundesanzeiger.de/
+    refresh: weekly
+    cost: free
+    auth: none
+    waf: unknown
+    method: playwright
+    tier: T1_primary_official
+    legal: Public filings; XBRL/PDF.
+    confidence: likely
+  - id: de-northdata
+    name: North Data — DE/AT/CH aggregator
+    country: DE
+    category: company_registry
+    access: api
+    url: https://www.northdata.com/
+    refresh: weekly
+    cost: paid
+    auth: apikey
+    waf: cloudflare
+    method: api_then_curl_cffi
+    tier: T2_aggregator
+    legal: Paid aggregator; fastest DACH coverage path.
+    confidence: verified
+  - id: at-firmenbuch
+    name: Firmenbuch (USP) — Austrian company register
+    country: AT
+    category: company_registry
+    access: scrape
+    url: https://www.usp.gv.at/
+    refresh: monthly
+    cost: paid
+    auth: account
+    waf: login_wall
+    method: ui_automation
+    tier: T1_primary_official
+    legal: Paid per-extract; aggregator (North Data) often cheaper at scale.
+    confidence: uncertain
+  - id: ch-zefix
+    name: Zefix — Swiss central business name index
+    country: CH
+    category: company_registry
+    access: api
+    url: https://www.zefix.ch/
+    refresh: weekly
+    cost: free
+    auth: none
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Public REST API.
+    confidence: likely
+
+# -------------------------- BENELUX + FRANCE --------------------------------
+benelux_france:
+  - id: nl-kvk
+    name: KVK — Netherlands Chamber of Commerce
+    country: NL
+    category: company_registry
+    access: api
+    url: https://developers.kvk.nl/
+    refresh: daily
+    cost: freemium
+    auth: apikey
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Official API; per-call pricing at volume.
+    confidence: verified
+  - id: nl-rdw
+    name: RDW — Netherlands vehicle OPEN data
+    country: NL
+    category: vehicle_registry
+    access: open_data
+    url: https://opendata.rdw.nl/
+    refresh: daily
+    cost: free
+    auth: none
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Excellent fully-open vehicle dataset (Socrata). Model market for vehicles.
+    confidence: verified
+  - id: be-kbo
+    name: KBO/BCE — Belgian Crossroads Bank for Enterprises
+    country: BE
+    category: company_registry
+    access: open_data
+    url: https://economie.fgov.be/en/themes/enterprises/crossroads-bank-enterprises
+    refresh: monthly
+    cost: free
+    auth: account
+    waf: none
+    method: bulk_download
+    tier: T1_primary_official
+    legal: Open Data bulk extract (registration required).
+    confidence: likely
+  - id: lu-lbr
+    name: LBR / RCS — Luxembourg Business Registers
+    country: LU
+    category: company_registry
+    access: scrape
+    url: https://www.lbr.lu/
+    refresh: monthly
+    cost: freemium
+    auth: none
+    waf: unknown
+    method: playwright
+    tier: T1_primary_official
+    legal: Public search; documents may be paid.
+    confidence: uncertain
+  - id: fr-sirene
+    name: INSEE SIRENE — French establishment register (OPEN BULK)
+    country: FR
+    category: company_registry
+    access: open_data
+    url: https://www.sirene.fr/sirene/public/static/open-data
+    refresh: daily
+    cost: free
+    auth: apikey
+    waf: none
+    method: bulk_download
+    tier: T1_primary_official
+    legal: Open bulk (~30M+ establishments). Huge, free.
+    confidence: verified
+  - id: fr-inpi-rne
+    name: INPI — Registre National des Entreprises
+    country: FR
+    category: directors_ubo
+    access: api
+    url: https://www.inpi.fr/
+    refresh: weekly
+    cost: free
+    auth: account
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Directors / beneficial owners / acts.
+    confidence: likely
+  - id: fr-pappers
+    name: Pappers — French company aggregator
+    country: FR
+    category: company_registry
+    access: api
+    url: https://www.pappers.fr/api
+    refresh: weekly
+    cost: freemium
+    auth: apikey
+    waf: cloudflare
+    method: api
+    tier: T2_aggregator
+    legal: Convenient aggregator over SIRENE/INPI/BODACC.
+    confidence: verified
+
+# --------------------------- SOUTHERN EUROPE --------------------------------
+southern:
+  - id: it-registroimprese
+    name: Registro Imprese (InfoCamere)
+    country: IT
+    category: company_registry
+    access: scrape
+    url: https://www.registroimprese.it/
+    refresh: monthly
+    cost: paid
+    auth: account
+    waf: login_wall
+    method: ui_automation
+    tier: T1_primary_official
+    legal: Paid per-document; aggregators (Atoka/Cerved) for scale.
+    confidence: uncertain
+  - id: it-atoka
+    name: Atoka — Italian B2B aggregator
+    country: IT
+    category: company_registry
+    access: api
+    url: https://atoka.io/
+    refresh: weekly
+    cost: paid
+    auth: apikey
+    waf: cloudflare
+    method: api
+    tier: T2_aggregator
+    legal: Paid; fastest IT coverage.
+    confidence: likely
+  - id: es-borme
+    name: BORME — Spanish Official Gazette of the Commercial Registry
+    country: ES
+    category: company_registry
+    access: open_data
+    url: https://www.boe.es/borme/
+    refresh: daily
+    cost: free
+    auth: none
+    waf: none
+    method: bulk_download
+    tier: T1_primary_official
+    legal: Daily official gazette (incorporations/changes) free; full register paid.
+    confidence: likely
+  - id: es-einforma
+    name: eInforma / Axesor — Spanish aggregators
+    country: ES
+    category: company_registry
+    access: scrape
+    url: https://www.einforma.com/
+    refresh: weekly
+    cost: paid
+    auth: account
+    waf: cloudflare
+    method: api_then_curl_cffi
+    tier: T2_aggregator
+    legal: Paid; combine with free BORME deltas.
+    confidence: uncertain
+  - id: pt-racius
+    name: Racius / Portal da Empresa — Portuguese companies
+    country: PT
+    category: company_registry
+    access: scrape
+    url: https://www.racius.com/
+    refresh: monthly
+    cost: freemium
+    auth: none
+    waf: cloudflare
+    method: curl_cffi
+    tier: T2_aggregator
+    legal: Public aggregator; official registry is paid.
+    confidence: uncertain
+
+# --------------------- BRITISH ISLES + CENTRAL EUROPE -----------------------
+isles_central:
+  - id: uk-companies-house
+    name: UK Companies House (API + bulk)
+    country: GB
+    category: company_registry
+    access: api
+    url: https://developer.company-information.service.gov.uk/
+    refresh: daily
+    cost: free
+    auth: apikey
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Fully open API + monthly bulk product. Gold standard.
+    confidence: verified
+  - id: uk-dvla-ves
+    name: DVLA Vehicle Enquiry Service + MOT History API
+    country: GB
+    category: vehicle_registry
+    access: api
+    url: https://developer-portal.driver-vehicle-licensing.api.gov.uk/
+    refresh: daily
+    cost: free
+    auth: apikey
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Per-reg lookup (VES) + MOT history API. No bulk personal data.
+    confidence: verified
+  - id: ie-cro
+    name: CRO — Irish Companies Registration Office
+    country: IE
+    category: company_registry
+    access: api
+    url: https://services.cro.ie/
+    refresh: weekly
+    cost: freemium
+    auth: account
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Open search; documents may be paid.
+    confidence: likely
+  - id: pl-krs
+    name: KRS + REGON (GUS) — Polish registers
+    country: PL
+    category: company_registry
+    access: api
+    url: https://api-krs.ms.gov.pl/
+    refresh: daily
+    cost: free
+    auth: none
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Free KRS API + CEIDG (sole traders) + REGON/BIR (GUS, key required).
+    confidence: likely
+  - id: cz-ares
+    name: ARES — Czech business register
+    country: CZ
+    category: company_registry
+    access: api
+    url: https://ares.gov.cz/
+    refresh: daily
+    cost: free
+    auth: none
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Free official REST API.
+    confidence: likely
+  - id: hu-ceginformacio
+    name: e-cégjegyzék / Céginformáció — Hungarian register
+    country: HU
+    category: company_registry
+    access: scrape
+    url: https://www.e-cegjegyzek.hu/
+    refresh: monthly
+    cost: freemium
+    auth: none
+    waf: unknown
+    method: playwright
+    tier: T1_primary_official
+    legal: Public search; bulk via Opten/Bisnode (paid).
+    confidence: uncertain
+
+# ----------------------- BUY-SIGNALS / ENRICHMENT ---------------------------
+buy_signals:
+  - id: jobtech-se
+    name: JobTech (Arbetsförmedlingen) — Swedish job postings
+    country: SE
+    category: buy_signal
+    access: api
+    url: https://jobsearch.api.jobtechdev.se/
+    refresh: daily
+    cost: free
+    auth: none
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Open API; hiring = growth/intent signal.
+    confidence: verified
+  - id: wayback-cdx
+    name: Wayback Machine CDX API — site change history
+    country: XX
+    category: buy_signal
+    access: api
+    url: https://web.archive.org/cdx/
+    refresh: daily
+    cost: free
+    auth: none
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Open; detect website/tech changes over time.
+    confidence: verified
+  - id: gdelt
+    name: GDELT — global news / events
+    country: XX
+    category: buy_signal
+    access: api
+    url: https://www.gdeltproject.org/
+    refresh: realtime
+    cost: free
+    auth: none
+    waf: none
+    method: api
+    tier: T1_primary_official
+    legal: Open; PR / M&A / expansion signals.
+    confidence: verified
+
+# ----------------------- PROFESSIONAL NETWORK / WEB -------------------------
+# NOTE: LinkedIn and company websites carry elevated legal/ToS exposure.
+# See docs/COMPLIANCE.md — these live in a separate, explicitly-gated tier.
+web_and_network:
+  - id: company-websites
+    name: Company websites (contact / team / about pages)
+    country: XX
+    category: company_web
+    access: scrape
+    url: per-company (resolved from registry domain)
+    refresh: monthly
+    cost: free
+    auth: none
+    waf: mixed
+    method: screaming_frog_then_playwright   # SF bulk crawl, browser fallback
+    tier: T4_web
+    legal: Public pages; respect robots.txt + rate limits; PII → GDPR tagging.
+    confidence: verified
+  - id: linkedin
+    name: LinkedIn (public profiles via search engines)
+    country: XX
+    category: professional_network
+    access: scrape
+    url: https://www.linkedin.com/
+    refresh: monthly
+    cost: free
+    auth: none
+    waf: login_wall
+    method: serp_discovery   # discover public profiles via search engines only
+    tier: T4_web
+    legal: ELEVATED RISK. ToS prohibits automated access. hiQ v LinkedIn is
+           unsettled and the LinkedIn UA/Microsoft posture is aggressive. Use
+           only public data surfaced via search engines; NEVER automate logged-in
+           sessions. Gated behind explicit operator sign-off. See COMPLIANCE.md.
+    confidence: verified
