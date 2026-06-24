@@ -1,0 +1,12 @@
+# Orchestrator requirements
+# Install: pip install -r requirements-orchestrator.txt
+
+fastapi>=0.111
+uvicorn[standard]>=0.30
+redis>=5.0
+psycopg2-binary>=2.9
+httpx>=0.27
+pydantic>=2.7
+pyyaml>=6.0
+python-dotenv>=1.0
+prometheus-fastapi-instrumentator>=7.0

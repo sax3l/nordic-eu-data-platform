@@ -1,0 +1,29 @@
+# Worker Dockerfile — OCR Pipeline
+# Build: docker build -f src/workers/Dockerfile.ocr -t nep-worker-ocr .
+# Used by docker-compose.full-stack.yml worker-ocr service
+
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    ca-certificates \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python deps with GPU support
+COPY requirements-ocr.txt .
+RUN pip install --no-cache-dir -r requirements-ocr.txt
+
+# Copy worker code
+COPY src/workers/ocr_worker.py .
+COPY src/workers/db.py .
+
+CMD ["python", "-u", "ocr_worker.py"]

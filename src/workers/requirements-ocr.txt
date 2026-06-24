@@ -1,0 +1,13 @@
+# Worker requirements — OCR Pipeline
+# Install: pip install -r requirements-ocr.txt
+
+paddlepaddle-gpu>=3.0  # or paddlepaddle (CPU)
+paddleocr>=2.8
+pytesseract>=0.3
+surya-ocr>=0.8
+python-doctr[tf]>=0.9  # or python-doctr[torch]
+openai>=1.35
+psycopg2-binary>=2.9
+redis>=5.0
+pillow>=10.3
+pydantic>=2.7

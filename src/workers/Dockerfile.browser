@@ -1,0 +1,42 @@
+# Worker Dockerfile — Browser Scraper
+# Build: docker build -f src/workers/Dockerfile.browser -t nep-worker-browser .
+# Used by docker-compose.full-stack.yml worker-browser service
+
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python deps
+COPY requirements-browser.txt .
+RUN pip install --no-cache-dir -r requirements-browser.txt
+
+# Install Playwright browsers
+RUN playwright install chromium
+RUN playwright install-deps chromium
+
+# Copy worker code
+COPY src/workers/browser_worker.py .
+COPY src/workers/adaptive_router.py .
+COPY src/workers/db.py .
+
+CMD ["python", "-u", "browser_worker.py"]
