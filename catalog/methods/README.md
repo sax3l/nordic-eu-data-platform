@@ -98,23 +98,33 @@ Every tier reports `success / latency / block` back to the router so the bandit 
 ### Data Extraction Tier
 | Runbook | Tool | Status |
 |---|---|---|
-| `trafilatura.md` | Trafilatura (boilerplate stripping) | planned |
+| [`trafilatura.md`](trafilatura.md) | Trafilatura (boilerplate stripping) | **done** |
+| [`firecrawl.md`](firecrawl.md) | Firecrawl (AI site-to-Markdown) | **done** |
 | `jina-reader.md` | Jina AI Reader | planned |
-| `firecrawl.md` | Firecrawl | planned |
 
 ### Dedup + Fusion Tier
 | Runbook | Tool | Status |
 |---|---|---|
-| `splink.md` | Splink (probabilistic record linkage) | planned |
+| [`splink.md`](splink.md) | Splink (probabilistic record linkage) | **done** |
 | `rapidfuzz.md` | RapidFuzz | planned |
 | `dedupe.md` | dedupe.io OSS | planned |
+
+### LLM Infrastructure Tier
+| Runbook | Tool | Status |
+|---|---|---|
+| [`litellm.md`](litellm.md) | LiteLLM (universal proxy, 100+ providers) | **done** |
 
 ### Licensed Tools Tier
 | Runbook | Tool | Status |
 |---|---|---|
-| `screaming-frog.md` | Screaming Frog SEO crawler | planned |
-| `sequentum.md` | Sequentum RPA | planned |
-| `uipath.md` | UiPath | planned |
-| `ranorex.md` | Ranorex | planned |
+| [`screaming-frog.md`](screaming-frog.md) | Screaming Frog SEO crawler ($199/yr) | **done** |
+| [`sequentum.md`](sequentum.md) | Sequentum RPA (visual scraping) | **done** |
+| [`uipath.md`](uipath.md) | UiPath (enterprise RPA + Document Understanding) | **done** |
+| [`ranorex.md`](ranorex.md) | Ranorex (desktop + web automation) | **done** |
 
-**Status:** 13 runbooks written, ~25 remaining planned. See [`DOCUMENTATION_PLAN.md`](../../DOCUMENTATION_PLAN.md) for the full documentation schedule.
+### Control Plane Tier
+| Runbook | Tool | Status |
+|---|---|---|
+| [`mcp-servers.md`](mcp-servers.md) | MCP servers (9 servers: Brave, Puppeteer, Postgres, Docker, Slack, FS, GitHub, SerpAPI, Tavily) | **done** |
+
+**Status:** 22 runbooks written, ~15 remaining planned. See [`DOCUMENTATION_PLAN.md`](../../DOCUMENTATION_PLAN.md) for the full documentation schedule.
