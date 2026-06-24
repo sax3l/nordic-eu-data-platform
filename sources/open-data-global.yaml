@@ -1,0 +1,637 @@
+# Open Data — Global Enrichment Sources Registry
+# Companion to sources.yaml (the 20-country registry). This file holds the
+# GLOBAL / cross-border / web-scale open datasets that enrich every market:
+# company graphs, firmographic/economic stats, web-scale signals, geo, intent,
+# filings/gazettes, technical-vehicle bulk, people-professional (compliant).
+#
+# Every entry was verified live via WebSearch (June 2026). Where a fact could
+# not be confirmed it is labelled "claimed" in notes. Prose write-up with the
+# "what it adds" rationale lives in catalog/data-sources/world-open-data.md.
+#
+# Field reference (extends sources.yaml; new fields marked *):
+#   name:        Human-readable source name
+#   url:         Base / portal URL
+#   api:         API endpoint (null if none)
+#   data:        [company, directors, ubo, financials, vehicles_technical,
+#                 contacts, legal_notices, intent, domains, geo, people, economic]
+#   access:      open_api | open_portal | open_bulk | bulk_sftp | sparql |
+#                bigquery_public | aggregator | gated_api
+#   format:      json | xml | csv | parquet | sqlite | rdf | html | pdf | jsonl | zip
+#   bulk:        true/false — whole-dataset download available?
+#   license:     SPDX-ish identifier or short licence name
+#   refresh:     realtime | 15min | hourly | daily | weekly | monthly | quarterly | annual
+#   reuse:       commercial_ok | commercial_license_required | no_direct_marketing | attribution_required *
+#   precond:     HARD routing preconditions the orchestrator must honour *
+#   what_adds:   one-line enrichment value *
+#   notes:       gotchas
+
+# ---------------------------------------------------------------------------
+# 1. GLOBAL COMPANY GRAPHS & CROSS-BORDER GOLDEN KEYS
+# ---------------------------------------------------------------------------
+company_graphs:
+  - name: GLEIF LEI (Golden Copy + Concatenated)
+    url: https://www.gleif.org/en/lei-data/gleif-golden-copy
+    api: https://api.gleif.org/api/v1/lei-records
+    data: [company, company_parent, cross_border_key]
+    access: open_bulk
+    format: [json, csv, xml]
+    bulk: true
+    license: CC0-1.0
+    refresh: daily        # 3 golden-copy + delta sets per day (every 8h)
+    reuse: commercial_ok
+    what_adds: Golden cross-border entity key (LEI) + "who owns whom" parent/child relationships.
+    notes: Free, no key. Golden Copy de-dupes technical duplicates. Best join key for group structure.
+
+  - name: OpenCorporates
+    url: https://opencorporates.com
+    api: https://api.opencorporates.com
+    data: [company, directors, financials]
+    access: aggregator     # API open; bulk is paid/ODbL
+    format: json
+    bulk: false            # bulk SFTP exists but paywalled as of 2026
+    license: ODbL-1.0 (bulk) / API ToS
+    refresh: daily
+    reuse: commercial_license_required
+    precond: Use only within API ToS / bulk licence. No scraping the website.
+    what_adds: Largest open legal-entity cross-jurisdiction index; reconciliation + jurisdiction coverage.
+    notes: Free at-scale only for journalists/NGOs/academia. Bulk no longer free for commercial users (2026).
+
+  - name: OpenSanctions
+    url: https://www.opensanctions.org
+    api: https://api.opensanctions.org
+    data: [company, directors, ubo, legal_notices, people]
+    access: open_bulk
+    format: [json, csv]
+    bulk: true
+    license: CC-BY-NC-4.0
+    refresh: daily
+    reuse: commercial_license_required   # NC licence — commercial needs paid licence
+    precond: Non-commercial only under CC-BY-NC. Commercial use requires a paid OpenSanctions licence.
+    what_adds: Sanctions, PEPs, watchlists, debarment — risk/compliance screening + UBO graph.
+    notes: Default dataset downloadable without key. FollowTheMoney schema aligns to entity graph.
+
+  - name: Open Ownership (BODS republished registers)
+    url: https://bods-data.openownership.org
+    api: null
+    data: [ubo, company]
+    access: open_bulk
+    format: [csv, json, parquet, sqlite, postgres]
+    bulk: true
+    license: source-dependent (mostly open)
+    refresh: periodic
+    reuse: commercial_ok   # per-source; check each register
+    what_adds: Beneficial-ownership (UBO) data in the BODS standard across multiple jurisdictions.
+    notes: Open Ownership Register prototype CLOSED 29 Nov 2024; republished bulk datasets remain. Standard at standard.openownership.org.
+
+  - name: EU BRIS (Business Registers Interconnection System)
+    url: https://e-justice.europa.eu/topics/registers-business-insolvency-land/business-registers-search-company-eu/general-information-find-company_en
+    api: https://webgate.ec.europa.eu/e-justice/searchBris.do
+    data: [company, directors]
+    access: open_portal
+    format: html
+    bulk: false
+    license: EU portal terms
+    refresh: realtime      # pulled live from member-state registers
+    reuse: commercial_ok
+    precond: Single-lookup portal, not bulk. Respect rate limits; no mass automation.
+    what_adds: One front-door to ~20M EU/EEA limited-liability companies + cross-border branch/merger links.
+    notes: Covers EU + IS/LI/NO + Societas Europaea. Companion BORIS interconnects UBO registers (access tightened post-2022 CJEU).
+
+  - name: Wikidata
+    url: https://www.wikidata.org
+    api: https://query.wikidata.org   # SPARQL
+    data: [company, people, geo]
+    access: sparql
+    format: [json, rdf, ttl]
+    bulk: true
+    license: CC0-1.0
+    refresh: weekly        # full dumps weekly; live SPARQL
+    reuse: commercial_ok
+    what_adds: Cross-links company → website/LEI/ISIN/ticker/industry/HQ; entity reconciliation hub.
+    notes: Free SPARQL + weekly JSON/RDF dumps at dumps.wikimedia.org/wikidatawiki/entities/. CC0 = no attribution required.
+
+  - name: datahub.io (Core Data / Frictionless)
+    url: https://datahub.io/core
+    api: https://api.datahub.io/core
+    data: [economic, geo, company]
+    access: open_bulk
+    format: [csv, json, zip]
+    bulk: true
+    license: mostly PDDL / public-domain (per package)
+    refresh: varies
+    reuse: commercial_ok
+    what_adds: Curated reference packages (country codes, NACE, currency, ISIN, population) for normalisation joins.
+    notes: Frictionless data packages (datapackage.json). Good for code-list crosswalks, not primary firmographics.
+
+# ---------------------------------------------------------------------------
+# 2. NATIONAL FILINGS / GAZETTES (open, cross-border useful)
+# ---------------------------------------------------------------------------
+filings_gazettes:
+  - name: SEC EDGAR (US comparator)
+    url: https://www.sec.gov/edgar/search/
+    api: https://data.sec.gov
+    data: [company, financials, directors, legal_notices]
+    access: open_api
+    format: [json, html, xml]
+    bulk: true
+    license: US-Gov public domain
+    refresh: realtime      # searchable <60s after filing
+    reuse: commercial_ok
+    precond: Set a descriptive User-Agent; honour fair-access (~10 req/s) limits.
+    what_adds: US-listed comparators, XBRL financials, insider/13F holdings — benchmark + parent-of-EU-sub linkage.
+    notes: Full-text search since 2001; submissions + companyfacts XBRL REST APIs on data.sec.gov.
+
+  - name: OffeneRegister.de (DE Handelsregister open snapshot)
+    url: https://offeneregister.de/daten/
+    api: https://db.offeneregister.de/
+    data: [company, directors]
+    access: open_bulk
+    format: [json, sqlite, csv]
+    bulk: true
+    license: CC-BY-4.0
+    refresh: static (2017-2019 snapshot)
+    reuse: commercial_ok
+    precond: Prefer this over scraping handelsregister.de (60 req/h cap, §303a/b StGB criminal exposure).
+    what_adds: ~5M German companies + officers as bulk — the lawful alternative to the WAF-walled official register.
+    notes: Snapshot is dated (2017-2019). For fresh DE data combine with Unternehmensregister / Bundesanzeiger filings.
+
+  - name: BOE / BORME (Spain official + mercantile gazette)
+    url: https://www.boe.es/diario_borme/
+    api: https://www.boe.es/datosabiertos/
+    data: [company, directors, legal_notices]
+    access: open_api
+    format: [xml, json, pdf]
+    bulk: true
+    license: BOE open-data terms (attribution)
+    refresh: daily
+    reuse: attribution_required
+    precond: Route Spanish corporate events HERE, not CORPME/registradores (automated access forbidden, WAF).
+    what_adds: Incorporations, capital changes, director appointments, dissolutions for Spain — the open ES company-event feed.
+    notes: data.boe.es JSON/XML API, no auth. Closest thing to an open ES company API.
+
+  - name: BODACC (France civil & commercial gazette)
+    url: https://www.bodacc.fr
+    api: https://bodacc-datadila.opendatasoft.com/api/
+    data: [company, legal_notices]
+    access: open_api
+    format: [json, csv]
+    bulk: true
+    license: Etalab-2.0 (Open Licence)
+    refresh: daily
+    reuse: commercial_ok
+    what_adds: French insolvencies, liquidations, sales/transfers, incorporations — distress + ownership-change signals.
+    notes: Free since 2011. Opendatasoft API + bulk. Sections A (sales/incorporations) B (corporate) C (accounts).
+
+  - name: Bundesanzeiger (DE Federal Gazette — financial filings)
+    url: https://www.bundesanzeiger.de
+    api: null
+    data: [financials, legal_notices]
+    access: open_portal
+    format: html
+    bulk: false
+    license: site terms
+    refresh: daily
+    reuse: no_direct_marketing
+    precond: No open API/bulk. Rate-limited UI only; do not mass-scrape. Pair with OffeneRegister for identity.
+    what_adds: German statutory annual-account disclosures (Jahresabschlüsse) — the DE financials gap-filler.
+    notes: Disclosure platform moved under Unternehmensregister.de. Financials present but access is UI-gated.
+
+# ---------------------------------------------------------------------------
+# 3. FIRMOGRAPHIC / ECONOMIC / STATISTICAL (context + NACE/SNI crosswalks)
+# ---------------------------------------------------------------------------
+economic_statistical:
+  - name: Eurostat
+    url: https://ec.europa.eu/eurostat
+    api: https://ec.europa.eu/eurostat/api/dissemination
+    data: [economic]
+    access: open_api
+    format: [json, sdmx, csv, tsv]
+    bulk: true
+    license: Eurostat reuse (attribution)
+    refresh: varies
+    reuse: attribution_required
+    what_adds: NACE-coded sector size/turnover/employment benchmarks; SBS firmographic context per region.
+    notes: SDMX 3.0 REST API, no key. Authoritative NACE Rev.2 classification (maps to SE SNI, etc.).
+
+  - name: World Bank Open Data
+    url: https://data.worldbank.org
+    api: https://api.worldbank.org/v2
+    data: [economic]
+    access: open_api
+    format: [json, xml, csv]
+    bulk: true
+    license: CC-BY-4.0
+    refresh: varies
+    reuse: attribution_required
+    what_adds: Country macro indicators for TAM sizing + market-prioritisation scoring.
+    notes: No key. Data360 is the newer unified API surface.
+
+  - name: OECD Data Explorer
+    url: https://data-explorer.oecd.org
+    api: https://sdmx.oecd.org/public/rest
+    data: [economic]
+    access: open_api
+    format: [json, sdmx, csv]
+    bulk: true
+    license: OECD terms (attribution)
+    refresh: varies
+    reuse: attribution_required
+    what_adds: Sector productivity, business demography, ICT-adoption — ICP refinement signals.
+    notes: SDMX API. Co-sponsor of SDMX standard with IMF/ECB/Eurostat/World Bank/UNSD.
+
+  - name: IMF Data
+    url: https://www.imf.org/en/Data
+    api: https://api.imf.org/external/sdmx/2.1
+    data: [economic]
+    access: open_api
+    format: [json, sdmx]
+    bulk: true
+    license: IMF terms
+    refresh: varies
+    reuse: attribution_required
+    what_adds: FX, balance-of-payments, financial-soundness indicators for market-risk weighting.
+    notes: SDMX. Legacy JSON endpoints being migrated to SDMX 2.1.
+
+  - name: UN Comtrade
+    url: https://comtradeplus.un.org
+    api: https://comtradeapi.un.org
+    data: [economic]
+    access: open_api
+    format: [json, csv]
+    bulk: false   # bulk download is premium
+    license: UN Comtrade terms
+    refresh: monthly
+    reuse: attribution_required
+    precond: Free key = 500 calls/day, 100k rows/query. Bulk download is premium.
+    what_adds: Import/export flows by HS code per country — trade-intensity buy-signals for importers/exporters.
+    notes: ~200 countries since 1962. Free key from the developer portal.
+
+# ---------------------------------------------------------------------------
+# 4. WEB-SCALE SIGNALS (domain discovery, popularity, host graph)
+# ---------------------------------------------------------------------------
+web_scale:
+  - name: Common Crawl (corpus + host/domain web graph)
+    url: https://commoncrawl.org/web-graphs
+    api: https://index.commoncrawl.org
+    data: [domains, company]
+    access: open_bulk
+    format: [warc, parquet, txt]
+    bulk: true
+    license: Common Crawl ToU (permissive)
+    refresh: monthly       # web graph ~quarterly aggregate; crawls monthly
+    reuse: commercial_ok
+    what_adds: Company-website discovery at web scale + host-level rank/centrality as a firm-importance proxy.
+    notes: Latest graph cc-main-2026-mar-apr-may (262M hosts). Free via s3://commoncrawl/ or data.commoncrawl.org.
+
+  - name: Tranco
+    url: https://tranco-list.eu
+    api: https://tranco-list.eu/api
+    data: [domains]
+    access: open_bulk
+    format: csv
+    bulk: true
+    license: research/open (attribution)
+    refresh: daily
+    reuse: attribution_required
+    what_adds: Manipulation-hardened domain-popularity rank — dedupe/prioritise the company-website fetch queue.
+    notes: 30-day averaged across CrUX/Cloudflare/Majestic etc. Stable, citable list IDs.
+
+  - name: Cloudflare Radar (domain rankings)
+    url: https://radar.cloudflare.com/domains
+    api: https://developers.cloudflare.com/radar/
+    data: [domains]
+    access: open_api
+    format: [json, csv]
+    bulk: true
+    license: Cloudflare Radar terms
+    refresh: daily
+    reuse: attribution_required
+    precond: API needs a free Cloudflare token; CSV datasets downloadable without auth.
+    what_adds: DNS-traffic-based popularity (top-100 ordered + buckets to 1M) — independent importance signal.
+    notes: Built from anonymised 1.1.1.1 resolver data. Replaced Alexa for many users.
+
+  - name: Majestic Million
+    url: https://majestic.com/reports/majestic-million
+    api: https://downloads.majestic.com/majestic_million.csv
+    data: [domains]
+    access: open_bulk
+    format: csv
+    bulk: true
+    license: CC-BY-3.0
+    refresh: daily
+    reuse: attribution_required
+    precond: Do not re-download more than once per 24h (ban risk).
+    what_adds: Backlink-authority domain rank (referring subnets/IPs) — site maturity/authority proxy.
+    notes: Direct CSV: downloads.majestic.com/majestic_million.csv.
+
+  - name: Certificate Transparency (crt.sh)
+    url: https://crt.sh
+    api: https://crt.sh/?q=%25.example.com&output=json
+    data: [domains, company]
+    access: open_api
+    format: [json, html]
+    bulk: false   # query-per-domain; full CT logs are huge/separate
+    license: public CT logs
+    refresh: realtime
+    reuse: commercial_ok
+    precond: Be gentle — shared Sectigo Postgres. Use JSON output param; cache results.
+    what_adds: Subdomain/asset discovery + org-name in cert SANs → maps infra footprint to a company.
+    notes: Backed by Sectigo Postgres over public CT logs. Org name field aids entity attribution.
+
+# ---------------------------------------------------------------------------
+# 5. INTENT / BUY-SIGNALS
+# ---------------------------------------------------------------------------
+intent_signals:
+  - name: TED (Tenders Electronic Daily)
+    url: https://ted.europa.eu
+    api: https://api.ted.europa.eu
+    data: [intent, company, legal_notices]
+    access: open_api
+    format: [json, xml]
+    bulk: true
+    license: EU reuse (mostly open)
+    refresh: daily
+    reuse: commercial_ok
+    precond: Free API key via developer.ted.europa.eu; search API also anonymous.
+    what_adds: EU public-procurement awards + bidders/winners — active-buyer + supplier-relationship signals.
+    notes: Bulk XML packages per day/month. eForms format since Nov 2022.
+
+  - name: JobTech Dev (Arbetsförmedlingen, SE jobs)
+    url: https://jobtechdev.se
+    api: https://historical.api.jobtechdev.se
+    data: [intent, company]
+    access: open_api
+    format: json
+    bulk: true
+    license: CC0 / open (Swedish gov)
+    refresh: realtime      # JobStream live; historical from 2006/2016
+    reuse: commercial_ok
+    what_adds: Hiring signals (job ads) → growth + tech-stack + role intent per Swedish employer.
+    notes: No key. JobSearch (live), JobStream (delta feed), Historical Ads (archive). Maps to SSYK/taxonomy.
+
+  - name: GDELT Project
+    url: https://www.gdeltproject.org
+    api: https://api.gdeltproject.org/api/v2
+    data: [intent, legal_notices]
+    access: bigquery_public
+    format: [csv, json]
+    bulk: true
+    license: GDELT terms (open)
+    refresh: 15min
+    reuse: commercial_ok
+    what_adds: Global news events + tone mentioning a company — M&A, expansion, distress, leadership-change triggers.
+    notes: Live every 15 min. CSV download + BigQuery public dataset. GKG links orgs/themes/people.
+
+  - name: EUIPO TMview / DesignView
+    url: https://www.tmdn.org/tmview/
+    api: https://www.euipo.europa.eu/en/search   # eSearch Plus REST
+    data: [intent, company, legal_notices]
+    access: open_api
+    format: [json, xml]
+    bulk: false
+    license: EUIPO terms
+    refresh: daily
+    reuse: attribution_required
+    what_adds: ~60M trademarks + ~14M designs → brand/product-launch intent + IP footprint per company.
+    notes: TMview spans ~75 offices; DesignView ~65. eSearch Plus = OAuth2 REST (EUTM + Madrid).
+
+  - name: Patents (Google Patents Public Data / EPO OPS)
+    url: https://patents.google.com
+    api: https://ops.epo.org/3.2   # EPO Open Patent Services
+    data: [intent, company]
+    access: bigquery_public
+    format: [json, xml]
+    bulk: true
+    license: Google Patents Public Data terms (IFI CLAIMS) / EPO OPS terms
+    refresh: weekly
+    reuse: commercial_ok
+    precond: EPO OPS = free tier with registration + monthly quota. BigQuery public dataset for bulk SQL.
+    what_adds: R&D activity + assignee company → innovation intensity, tech-area, IP-ownership graph.
+    notes: BigQuery `patents-public-data`. EPO OPS REST for live single lookups.
+
+# ---------------------------------------------------------------------------
+# 6. PEOPLE / PROFESSIONAL (compliant — public web only; NO authenticated LinkedIn)
+# ---------------------------------------------------------------------------
+people_professional:
+  - name: ORCID Public Data File
+    url: https://info.orcid.org/orcid-public-data-file/
+    api: https://pub.orcid.org/v3.0
+    data: [people]
+    access: open_bulk
+    format: [xml, json]
+    bulk: true
+    license: CC0-1.0
+    refresh: annual
+    reuse: commercial_ok
+    what_adds: Researchers + employment/education affiliations → person↔organisation links (respecting privacy flags).
+    notes: Annual CC0 dump (Open Access Week) + public API. Only data the researcher set public.
+
+  - name: OpenAlex
+    url: https://openalex.org
+    api: https://api.openalex.org
+    data: [people, company]
+    access: open_bulk
+    format: [json, parquet]
+    bulk: true
+    license: CC0-1.0
+    refresh: monthly
+    reuse: commercial_ok
+    what_adds: 470M+ works → authors + institutions graph; R&D-org mapping + academic-affiliation enrichment.
+    notes: Free API (polite pool with mailto) + S3 snapshot. Successor to Microsoft Academic Graph.
+
+  - name: GH Archive (GitHub public events)
+    url: https://www.gharchive.org
+    api: null
+    data: [people, company]
+    access: bigquery_public
+    format: [json, jsonl]
+    bulk: true
+    license: GH Archive (public GitHub timeline)
+    refresh: hourly
+    reuse: commercial_ok
+    precond: Public events only. Treat developer PII under GDPR; org-level signal preferred.
+    what_adds: Developer activity + org membership/tech-stack → engineering-team size + technology intent.
+    notes: Hourly JSON archives + BigQuery public dataset (~30M events/month).
+
+  - name: Public web / company sites (general SERP resolution)
+    url: null
+    api: null
+    data: [people, contacts, company]
+    access: open_portal
+    format: html
+    bulk: false
+    license: per-site robots/ToS
+    refresh: on-demand
+    reuse: no_direct_marketing   # personal data → GDPR lawful basis required
+    precond: >
+      LinkedIn resolution = PUBLIC search-engine only (site:linkedin.com/in).
+      NEVER authenticate, never solve LinkedIn auth, never crawl logged-in.
+      Honour robots.txt + rate limits. Per-country DNC/suppression enforced downstream.
+    what_adds: Decision-maker name/role/public profile via compliant multi-engine SERP + company-site scrape.
+    notes: Mirrors the existing company-contact-finder / contact-intel skills. Off-by-default elevated tier.
+
+# ---------------------------------------------------------------------------
+# 7. VEHICLES — TECHNICAL / FLEET ONLY (owner data is CLOSED in ~18/20 markets)
+# ---------------------------------------------------------------------------
+vehicles_technical:
+  # HARD RULE: these are TECHNICAL/registration datasets. They DO NOT carry
+  # owner PII. Never imply pan-EU owner coverage. Owner linkage (Nordic reseller
+  # scrape) is a separate, narrowly-scoped, flagged lane — not in this file.
+  - name: RDW Open Data (NL)
+    url: https://opendata.rdw.nl
+    api: https://opendata.rdw.nl/resource/m9d7-ebf2.json   # Socrata SoQL
+    data: [vehicles_technical]
+    access: open_api
+    format: [json, csv]
+    bulk: true
+    license: CC0 / public (Dutch gov)
+    refresh: daily
+    reuse: commercial_ok
+    what_adds: Full Dutch fleet by plate — make/model/fuel/body/specs; technical vehicle reference at scale.
+    notes: Socrata API ($where/$limit/$offset). No owner data. Companion fuel/body/defect tables.
+
+  - name: Traficom Open Vehicle Data (FI)
+    url: https://www.avoindata.fi/data/en_GB/dataset/ajoneuvojen-avoin-data
+    api: null
+    data: [vehicles_technical]
+    access: open_bulk
+    format: [csv, zip]
+    bulk: true
+    license: CC-BY-4.0
+    refresh: monthly
+    reuse: attribution_required
+    what_adds: ~5.25M Finnish vehicles — registration/approval/technical attributes (no owner).
+    notes: ZIP-CSV ~930MB unpacked (ISO-8859-1). Via avoindata.fi / tieto.traficom.fi.
+
+  - name: UK MOT History + VES (GB/NI)
+    url: https://documentation.history.mot.api.gov.uk/
+    api: https://history.mot.api.gov.uk/v1/trade/vehicles
+    data: [vehicles_technical]
+    access: gated_api
+    format: [json, jsonl]
+    bulk: true
+    license: OGL v3 / DVSA terms
+    refresh: daily
+    reuse: commercial_ok
+    precond: MOT bulk needs a free DVSA API key. VES (DVLA) lookup is per-vehicle, purpose-bound.
+    what_adds: MOT test history + mileage/failures (since 2005) + technical lookup — vehicle condition/age signal.
+    notes: Bulk = gzip JSON (~500k/file) + daily deltas. Anonymised MOT dataset also on data.gov.uk. No owner PII.
+
+  - name: DGT Microdatos Parque de Vehículos (ES)
+    url: https://datos.gob.es/es/catalogo/e00130502-microdatos-de-parque-de-vehiculos-anual1
+    api: null
+    data: [vehicles_technical]
+    access: open_bulk
+    format: [csv, zip]
+    bulk: true
+    license: datos.gob.es open terms
+    refresh: monthly
+    reuse: attribution_required
+    what_adds: Spanish vehicle stock by type/fuel/age/province — fleet-composition firmographics.
+    notes: Monthly+annual ZIP. Since Feb 2025 MATRABA files dropped chassis detail (legitimate-interest request needed).
+
+  - name: ASTRA / IVZ Open Vehicle Data (CH)
+    url: https://opendata.swiss/en/dataset?organization=bundesamt-fur-strassen-astra
+    api: https://opendata.astra.admin.ch/ivzod
+    data: [vehicles_technical]
+    access: open_bulk
+    format: [csv]
+    bulk: true
+    license: opendata.swiss terms
+    refresh: annual
+    reuse: attribution_required
+    what_adds: Swiss road-vehicle stock by group/type/canton/fuel/first-registration (from 1990) — no owner.
+    notes: Free standard datasets at opendata.astra.admin.ch/ivzod. Detailed records are fee-based.
+
+  - name: ACI / MIT Open Vehicle Data (IT)
+    url: https://www.aci.it/laci/studi-e-ricerche/dati-e-statistiche.html
+    api: null
+    data: [vehicles_technical]
+    access: open_portal
+    format: [csv, xls]
+    bulk: true
+    license: ACI / dati.gov.it terms
+    refresh: monthly
+    reuse: attribution_required
+    what_adds: Italian PRA vehicle-park + new-registration statistics by province/fuel/segment.
+    notes: Aggregate/statistical. Individual owner lookup (visura PRA) is paid & separate — not open.
+
+# ---------------------------------------------------------------------------
+# 8. GEO / LOCATION (address normalisation, geocoding, place enrichment)
+# ---------------------------------------------------------------------------
+geo:
+  - name: OpenStreetMap (+ Nominatim)
+    url: https://www.openstreetmap.org
+    api: https://nominatim.openstreetmap.org
+    data: [geo, company]
+    access: open_bulk
+    format: [pbf, xml, json]
+    bulk: true
+    license: ODbL-1.0
+    refresh: realtime      # minutely diffs; planet weekly
+    reuse: commercial_ok   # ODbL share-alike obligations apply
+    precond: >
+      Public Nominatim = max 1 req/s, no heavy/bulk geocoding. Self-host Nominatim
+      for volume. ODbL share-alike applies to derived databases.
+    what_adds: POI/company premises, addresses, opening hours, geocoding backbone for every market.
+    notes: Geofabrik regional extracts for bulk. ODbL attribution + share-alike.
+
+  - name: GeoNames
+    url: https://www.geonames.org/export/
+    api: https://www.geonames.org/export/web-services.html
+    data: [geo]
+    access: open_bulk
+    format: [txt, csv]
+    bulk: true
+    license: CC-BY-4.0
+    refresh: daily
+    reuse: attribution_required
+    what_adds: 25M+ place names + admin hierarchy + postal codes — address standardisation & region rollups.
+    notes: allCountries.zip daily. Free web service (rate-limited; self-host for volume).
+
+  - name: Overture Maps (Places / Buildings / Addresses)
+    url: https://overturemaps.org
+    api: null
+    data: [geo, company]
+    access: open_bulk
+    format: [parquet, geojson]
+    bulk: true
+    license: CDLA-Permissive-2.0 (Places) / ODbL (OSM-derived themes)
+    refresh: monthly
+    reuse: commercial_ok
+    precond: Places = CDLA-Permissive (commercial OK). OSM-derived themes carry ODbL share-alike.
+    what_adds: Global Places (business POIs) with GERS stable IDs — company-premises + brand/category enrichment.
+    notes: S3/Azure Parquet (overturemaps.org/download). GERS = cross-dataset entity join key.
+
+# ---------------------------------------------------------------------------
+# 9. PORTAL CATALOGS (discovery layer — find more open datasets per country)
+# ---------------------------------------------------------------------------
+portal_catalogs:
+  - name: data.europa.eu (EU Open Data Portal + HVD)
+    url: https://data.europa.eu
+    api: https://data.europa.eu/api/hub/search/
+    data: [company, economic, geo, vehicles_technical]
+    access: open_portal
+    format: [dcat-ap, json]
+    bulk: false   # catalog of catalogs; datasets are external
+    license: per-dataset
+    refresh: daily
+    reuse: commercial_ok
+    precond: HVD "companies & company ownership" datasets MUST be free + API + bulk (EU Reg 2023/138).
+    what_adds: Single index of EU High-Value Datasets (company ownership, geospatial, mobility, statistics).
+    notes: Filter is_hvd=true. DCAT-AP metadata harvested daily from national portals. HVD dashboard in beta.
+
+  - name: National open-data portals (CKAN / Socrata)
+    url: https://dataportals.org
+    api: null   # each portal exposes its own CKAN/Socrata API
+    data: [company, economic, geo, vehicles_technical]
+    access: open_portal
+    format: [csv, json, dcat]
+    bulk: varies
+    license: per-portal
+    refresh: varies
+    reuse: commercial_ok
+    what_adds: data.gov.uk, govdata.de, datos.gob.es, data.gouv.fr, open.canada.ca, data.gov — per-country dataset discovery.
+    notes: >
+      CKAN portals expose /api/3/action/package_search; Socrata exposes SODA /resource/{id}.json.
+      DataPortals.org indexes 500+ portals worldwide. Use to find country-specific company/vehicle/geo sets.

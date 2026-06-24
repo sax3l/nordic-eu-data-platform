@@ -14,7 +14,7 @@
 2. **Honest Accuracy** — Vi lovar inte 97% och levererar 65%. Vi publicerar faktisk confidence per fält.
 3. **GDPR-native** — Varje datapunkt har provenance, källa, och laglig grund dokumenterad.
 4. **Adaptive** — Plattformen känner av vilken metod som fungerar och byter automatiskt.
-5. **SIAX Ecosystem** — Byggd på nordic-eu-data-platform, integrerad med siax.io, VehIQ, Protosell/FiveCRM.
+5. **SIAX Ecosystem** — Byggd på nordic-eu-data-platform, integrerad med siax.io, VehIQ, FiveCRM.
 
 ---
 

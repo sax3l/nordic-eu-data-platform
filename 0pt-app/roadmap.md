@@ -132,7 +132,7 @@ Month 1     Month 2     Month 3     Month 4     Month 5     Month 6
 2. **Wireframe order wizard** — the core UX differentiator
 3. **Connect nordic-eu-data-platform** as the backend engine
 4. **Launch with 15 services** — the highest-demand, lowest-complexity ones
-5. **Get first 3 customers** — Protosell internal + 2 external bilhandlare
+5. **Get first 3 customers** — SIAX internal + 2 external bilhandlare
 6. **Iterate based on real usage** — what do people actually order?
 
 ---

@@ -6,7 +6,7 @@
 
 ## Direct CRM Exports
 
-### FiveCRM (Primary — Protosell customers)
+### FiveCRM (Primary — SIAX customers)
 ```python
 # Auto-export enriched data directly to FiveCRM
 POST /api/v1/export/fivecrm
@@ -57,7 +57,7 @@ POST /api/v1/export/salesforce
 
 ### Blikk
 ```python
-# Export to Blikk (existing Protosell integration)
+# Export to Blikk (existing SIAX integration)
 POST /api/v1/export/blikk
 {
   "order_id": "ord_xyz",

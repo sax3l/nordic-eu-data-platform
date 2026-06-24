@@ -4,7 +4,7 @@
 
 **Status:** 🚧 Design + documentation phase. **13 operational runbooks, 85+ OSS tool catalog, docker-compose full‑stack, example pipeline.** Code lands once the blueprint is ratified.
 
-**Live repo:** https://github.com/sax3l/nordic-eu-data-platform
+**Owner:** SIAX — Simon Axelsson · **Runtime:** local-first (Vercel hosts only the thin frontend, on Simon's personal account) · **Repo:** github.com/sax3l/nordic-eu-data-platform · See [DEPLOYMENT.md](DEPLOYMENT.md)
 
 ---
 
@@ -97,4 +97,4 @@ See [`sources/sources.yaml`](sources/sources.yaml) for the machine‑readable re
 
 ---
 
-© Protosell / SIAX. Internal — not for distribution. See [`LICENSE`](LICENSE) and [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md).
+© 2026 SIAX — Simon Axelsson. Internal — not for distribution. See [`LICENSE`](LICENSE) and [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md).

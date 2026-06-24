@@ -33,7 +33,7 @@
 │  ├── ML / AI & Advanced Analytics                                        │
 │  └── Document & Media Processing                                         │
 │                                                                          │
-│  Protosell (Internt)                                                     │
+│  SIAX (Internt)                                                     │
 │  ├── FiveCRM (CRM-system)                                                │
 │  ├── Data Loader OS                                                      │
 │  ├── Blikk (tidrapportering)                                             │
@@ -70,9 +70,9 @@
 | Fleet Analysis | Bolagsägda fordon från Transportstyrelsen/RDW |
 | Export/Import | Gränsöverskridande fordonsdata |
 
-### 0pt.app → Protosell (Internt)
+### 0pt.app → SIAX (Internt)
 
-| 0pt.app-tjänst | Protosell-användning |
+| 0pt.app-tjänst | SIAX-användning |
 |---|---|
 | ICP Lead Lists | Bättre leads till CSMs databasbeställningar |
 | Company Databases | Datakvalitet i FiveCRM |
@@ -165,7 +165,7 @@ Varje artikel har CTA: "Testa 0pt.app — första datasetet 50% rabatt"
 
 - [ ] 0pt.app domän (0pt.app eller 0pt.siax.io)
 - [ ] Landing page med servicekatalog
-- [ ] 3 case studies (Protosell-internt + 2 bilhandlare)
+- [ ] 3 case studies (SIAX-internt + 2 bilhandlare)
 - [ ] 5 bloggartiklar som leder till 0pt.app
 - [ ] Stripe integration (betalning)
 - [ ] 15 tjänster live (MVP-omfattning)
