@@ -1,0 +1,375 @@
+# docker-compose.full-stack.yml
+# Complete local deployment of the Nordic+EU adaptive data platform.
+# All components are FOSS, run locally, zero external API costs.
+#
+# Quick start:
+#   1. docker compose -f docker-compose.full-stack.yml up -d
+#   2. Workers auto-register with Redis queue
+#   3. Orchestrator API at http://localhost:8000
+#   4. Dashboard at http://localhost:3001
+#
+# Hardware: 32GB RAM minimum, 64GB recommended. GPU strongly recommended for OCR + LLM.
+
+version: "3.9"
+
+services:
+  # ============================================================================
+  # INFRASTRUCTURE LAYER
+  # ============================================================================
+
+  redis:
+    image: redis:7-alpine
+    container_name: nep-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+
+  postgres:
+    image: pgvector/pgvector:pg16  # Includes pgvector for embeddings
+    container_name: nep-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: platform
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_DB: nordic_eu_data
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U platform -d nordic_eu_data"]
+      interval: 10s
+
+  # ============================================================================
+  # PROXY ROTATION LAYER
+  # ============================================================================
+
+  proxy-rotator:
+    image: ghcr.io/rota-framework/rota:latest
+    container_name: nep-proxy-rotator
+    ports:
+      - "8080:8080"
+      - "5555:5555"  # Dashboard
+    environment:
+      ROTA_FREE_LISTS: "true"
+      ROTA_HEALTH_INTERVAL: 60
+      ROTA_MAX_PROXIES: 500
+    volumes:
+      - ./config/rota.yml:/app/config.yml
+      - proxy_cache:/app/cache
+    restart: unless-stopped
+
+  tor-pool:
+    image: dperson/torproxy
+    container_name: nep-tor
+    ports:
+      - "9050:9050"
+      - "9052:9052"
+      - "9054:9054"
+      - "9056:9056"
+    restart: unless-stopped
+    # Provides 4 parallel Tor circuits for residential-like IPs
+
+  # ============================================================================
+  # ANTI-BOT / BYPASS LAYER
+  # ============================================================================
+
+  flaresolverr:
+    image: flaresolverr/flaresolverr:latest
+    container_name: nep-flaresolverr
+    ports:
+      - "8191:8191"
+    environment:
+      LOG_LEVEL: info
+      LOG_HTML: "false"
+      CAPTCHA_SOLVER: none
+      HEADLESS: "true"
+    restart: unless-stopped
+    depends_on:
+      - proxy-rotator
+
+  cloakbrowser:
+    image: cloakhq/cloakbrowser:latest
+    container_name: nep-cloakbrowser
+    ports:
+      - "9222:9222"  # CDP endpoint for Playwright
+    shm_size: "2gb"  # Chromium needs shared memory
+    environment:
+      CB_HEADLESS: "true"
+      CB_STEALTH_LEVEL: maximum
+      CB_PROXY: "http://proxy-rotator:8080"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  cloakbrowser-manager:
+    image: cloakhq/cloakbrowser-manager:latest
+    container_name: nep-cloak-manager
+    ports:
+      - "3000:3000"
+    environment:
+      CB_PROXY: "http://proxy-rotator:8080"
+    volumes:
+      - cloak_profiles:/app/profiles
+    depends_on:
+      - cloakbrowser
+    restart: unless-stopped
+
+  # ============================================================================
+  # BROWSER WORKER POOL (5 workers — scale with docker compose up --scale)
+  # ============================================================================
+
+  worker-browser:
+    build:
+      context: ./src/workers
+      dockerfile: Dockerfile.browser
+    container_name: nep-worker-browser
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CLOAKBROWSER_CDP: http://cloakbrowser:9222
+      PROXY_URL: http://proxy-rotator:8080
+      FLARESOLVERR_URL: http://flaresolverr:8191
+      POSTGRES_URL: postgresql://platform:${DB_PASSWORD:-changeme}@postgres:5432/nordic_eu_data
+      OLLAMA_URL: http://ollama:11434
+      UNSTRUCTURED_URL: http://unstructured:8000
+    volumes:
+      - ./src:/app/src
+      - worker_data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      cloakbrowser:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      replicas: 3  # Start with 3, scale up
+
+  # ============================================================================
+  # AI / LLM LAYER
+  # ============================================================================
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nep-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: 24h
+      OLLAMA_HOST: 0.0.0.0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      retries: 3
+
+  # Pre-pull models on first start
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: nep-ollama-init
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Pulling models... (this may take 10-30 min on first run)"
+        ollama pull qwen2.5:14b
+        ollama pull llama3.1:8b
+        ollama pull phi4:14b
+        ollama pull bge-m3
+        echo "Models ready."
+    environment:
+      OLLAMA_HOST: ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: nep-vllm
+    ports:
+      - "8001:8000"
+    command:
+      - --model
+      - Qwen/Qwen2.5-14B-Instruct
+      - --gpu-memory-utilization
+      - "0.90"
+      - --max-model-len
+      - "8192"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    profiles:
+      - gpu-heavy  # Only start with: docker compose --profile gpu-heavy up
+
+  # ============================================================================
+  # DOCUMENT PROCESSING LAYER
+  # ============================================================================
+
+  unstructured:
+    image: quay.io/unstructured-io/unstructured-api:latest
+    container_name: nep-unstructured
+    ports:
+      - "8002:8000"
+    environment:
+      UNSTRUCTURED_MEMORY_FREE_MINIMUM: "1"
+    restart: unless-stopped
+
+  # ============================================================================
+  # OCR WORKER (dedicated — PaddleOCR + Tesseract + Surya)
+  # ============================================================================
+
+  worker-ocr:
+    build:
+      context: ./src/workers
+      dockerfile: Dockerfile.ocr
+    container_name: nep-worker-ocr
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      OLLAMA_URL: http://ollama:11434
+      UNSTRUCTURED_URL: http://unstructured:8000
+      POSTGRES_URL: postgresql://platform:${DB_PASSWORD:-changeme}@postgres:5432/nordic_eu_data
+    volumes:
+      - ./src:/app/src
+      - ocr_cache:/app/cache
+    depends_on:
+      redis:
+        condition: service_healthy
+      unstructured:
+        condition: service_started
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # ============================================================================
+  # ORCHESTRATOR API
+  # ============================================================================
+
+  orchestrator:
+    build:
+      context: ./src/orchestrator
+      dockerfile: Dockerfile
+    container_name: nep-orchestrator
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      POSTGRES_URL: postgresql://platform:${DB_PASSWORD:-changeme}@postgres:5432/nordic_eu_data
+      SOURCES_YAML: /app/sources/sources.yaml
+      OLLAMA_URL: http://ollama:11434
+    volumes:
+      - ./sources:/app/sources:ro
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================================================
+  # DASHBOARD + MONITORING
+  # ============================================================================
+
+  dashboard:
+    build:
+      context: ./src/dashboard
+      dockerfile: Dockerfile
+    container_name: nep-dashboard
+    ports:
+      - "3001:3000"
+    environment:
+      API_URL: http://orchestrator:8000
+    depends_on:
+      - orchestrator
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nep-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nep-grafana
+    ports:
+      - "9091:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # ============================================================================
+  # OPTIONAL: SEQUENTUM BRIDGE (if licensed — comment out if not)
+  # ============================================================================
+
+  # sequentum-bridge:
+  #   build:
+  #     context: ./src/bridges/sequentum
+  #     dockerfile: Dockerfile
+  #   container_name: nep-sequentum
+  #   environment:
+  #     REDIS_URL: redis://redis:6379/0
+  #     SEQUENTUM_API: http://host.docker.internal:8081  # Runs on Windows host
+  #   depends_on:
+  #     - redis
+  #   restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
+  proxy_cache:
+  cloak_profiles:
+  worker_data:
+  ollama_data:
+  ocr_cache:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default:
+    name: nep-platform
+    driver: bridge
